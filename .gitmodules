@@ -1,0 +1,3 @@
+[submodule "dependencies/Cylinder3D"]
+	path = dependencies/Cylinder3D
+	url = https://github.com/Tuxacker/Cylinder3D.git
