@@ -3,6 +3,7 @@
 # This generation script is based on the CARLA API example for projecting lidar point clouds into RGB images
 
 from datetime import datetime
+from pathlib import Path
 import os
 import sys
 
@@ -76,10 +77,10 @@ def sensor_callback(data, queue):
     queue.put(data)
 
 
-def tutorial(args):
+def main(args, output_folder):
     client = carla.Client(args.host, args.port)
     client.set_timeout(20.0)
-    print(client.get_available_maps())
+    # print(client.get_available_maps())
     # world = client.get_world()
     # world = client.load_world("Town11")
     world = client.load_world(MAP, carla.MapLayer.Buildings | carla.MapLayer.Foliage | carla.MapLayer.Ground | carla.MapLayer.Walls)
@@ -102,13 +103,10 @@ def tutorial(args):
     lidar = None
 
     try:
-        if not os.path.isdir('_out'):
-            os.mkdir('_out')
         # Search the desired blueprints
         camera_bp = bp_lib.filter("sensor.camera.rgb")[0]
         segmentation_bp = bp_lib.filter("sensor.camera.semantic_segmentation")[0]
-        lidar_bp = bp_lib.filter("sensor.lidar.ray_cast_semantic")[0]        start_position = start_transform.location
-        start_rotaion = start_transform.rotation
+        lidar_bp = bp_lib.filter("sensor.lidar.ray_cast_semantic")[0]
 
         segmentation_bp.set_attribute("image_size_x", str(args.width))
         segmentation_bp.set_attribute("image_size_y", str(args.height))
@@ -217,20 +215,20 @@ def tutorial(args):
             if wp_id < len(WAYPOINTS) - 1:
                 pcl_all += pcl
             if frame == args.frames - 1:
-                o3d.io.write_point_cloud(f"_out/{ds}_pcl.ply", pcl_all)
+                o3d.io.write_point_cloud(f"{output_folder}/{ds}_pcl.ply", pcl_all)
 
             # Save the image using Pillow module.
             if frame == args.frames - 1:
                 image = Image.fromarray(im_array)
-                image.save(f"_out/{ds}.png")
+                image.save(f"{output_folder}/{ds}.png")
 
-                segmentation_data.save_to_disk(f"_out/{ds}_seg.png", carla.ColorConverter.CityScapesPalette)
+                segmentation_data.save_to_disk(f"{output_folder}/{ds}_seg.png", carla.ColorConverter.CityScapesPalette)
 
                 current_transform = segmentation.get_transform()
                 lx, ly, lz = current_transform.location.x, current_transform.location.y, current_transform.location.z
                 pit, yaw, roll = current_transform.rotation.pitch, current_transform.rotation.yaw, current_transform.rotation.roll
 
-                with open(f"_out/{ds}.txt", "w") as f:
+                with open(f"{output_folder}/{ds}.txt", "w") as f:
                     f.write(f"x={lx} y={ly} z={lz} p={pit} y={yaw}\n")
                 # camera.set_transform(carla.Transform(carla.Location(x=88 + (frame // 20) * 10, y=58, z=6), carla.Rotation(pitch=-10, yaw=0 + (frame // 20) * 4)))
                 # segmentation.set_transform(carla.Transform(carla.Location(x=88 + (frame // 20) * 10, y=58, z=6), carla.Rotation(pitch=-10, yaw=0 + (frame // 20) * 4)))
@@ -260,7 +258,7 @@ def tutorial(args):
             lidar.destroy()
 
 
-def main():
+def entrypoint():
     """Start function"""
     argparser = argparse.ArgumentParser(
         description='CARLA Sensor sync and projection tutorial')
@@ -323,8 +321,13 @@ def main():
     args = argparser.parse_args()
     args.width, args.height = [int(x) for x in args.res.split('x')]
 
+    output_folder = Path(__file__).absolute().parent.parent / "output_carla"
+    output_folder.mkdir(exist_ok=True)
+    output_folder = str(output_folder)
+    print(f"Saving data to {output_folder}")
+
     try:
-        tutorial(args)
+        main(args, output_folder)
 
     except KeyboardInterrupt:
         print('\nCancelled by user. Bye!')
@@ -332,4 +335,4 @@ def main():
 
 if __name__ == '__main__':
 
-    main()
+    entrypoint()
